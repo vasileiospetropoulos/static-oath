@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>STATIC OATH radio receiver emblem</title>
+  <rect width="64" height="64" rx="9" fill="#0B0C0B" />
+  <rect
+    x="8"
+    y="7"
+    width="48"
+    height="50"
+    rx="4"
+    fill="#191A18"
+    stroke="#343530"
+    stroke-width="2"
+  />
+  <path d="M18 13h28" fill="none" stroke="#96764E" stroke-width="2" />
+  <circle cx="13" cy="12" r="1.5" fill="#C3BBAA" />
+  <circle cx="51" cy="12" r="1.5" fill="#C3BBAA" />
+  <rect
+    x="13"
+    y="19"
+    width="38"
+    height="25"
+    rx="2"
+    fill="#0B0C0B"
+    stroke="#858A66"
+    stroke-width="1.5"
+  />
+  <path
+    d="M16 32h4l2.5-6 4 12 4-9 3 6 3-4 3 1h3l2 4 2-4h2"
+    fill="none"
+    stroke="#C3BBAA"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    stroke-width="2"
+  />
+  <path d="M15 49h17m4 0h3" fill="none" stroke="#343530" stroke-width="2" />
+  <circle cx="47" cy="49" r="3" fill="#96764E" stroke="#C3BBAA" stroke-width="1" />
+</svg>

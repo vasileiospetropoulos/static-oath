@@ -1,0 +1,47 @@
+:root {
+  font-family: 'Arial', 'Segoe UI', sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  --color-background: #0b0c0b;
+  --color-panel: #191a18;
+  --color-worn: #343530;
+  --color-text: #c3bbaa;
+  --color-muted: #a7a194;
+  --color-subtle: #858176;
+  --color-olive: #858a66;
+  --color-rust: #87483b;
+  --color-rust-light: #c18c7b;
+  --color-amber: #96764e;
+  --color-amber-text: #b7a176;
+  --color-border: rgb(195 187 170 / 14%);
+  --font-mono: 'Cascadia Mono', 'SFMono-Regular', Consolas, monospace;
+
+  color: var(--color-text);
+  background: var(--color-background);
+  font-optical-sizing: auto;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 320px;
+  min-height: 100%;
+  background: var(--color-background);
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+}
+
+::selection {
+  color: var(--color-background);
+  background: var(--color-olive);
+}

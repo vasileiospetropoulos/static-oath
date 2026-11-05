@@ -1,0 +1,12 @@
+{
+  "title": "STATIC OATH",
+  "tagline": "TRUST THE CREW, DOUBT THE SIGNAL...",
+  "eyebrow": "FIELD SYSTEMS / 001",
+  "buildLabel": "ALPHA VERSION / 0.1",
+  "statusLabel": "SYSTEM STATUS",
+  "panelCode": "SYS / 001",
+  "statusValue": "FOUNDATION ONLINE",
+  "description": "Core application shell established. Mission systems will be added in later development phases.",
+  "footerLabel": "STATIC OATH / APPLICATION FOUNDATION",
+  "footerStatus": "ALPHA VERSION"
+}

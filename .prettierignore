@@ -1,0 +1,5 @@
+node_modules/
+dist/
+package-lock.json
+docs/STATIC_OATH_GDD_v0.1.md
+.tsupgrader/

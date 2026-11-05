@@ -1,0 +1,12 @@
+{
+  "title": "STATIC OATH",
+  "tagline": "TRUST THE CREW, DOUBT THE SIGNAL...",
+  "eyebrow": "ΣΥΣΤΗΜΑΤΑ ΠΕΔΙΟΥ / 001",
+  "buildLabel": "ALPHA VERSION / 0.1",
+  "statusLabel": "ΚΑΤΑΣΤΑΣΗ ΣΥΣΤΗΜΑΤΟΣ",
+  "panelCode": "ΣΥΣ / 001",
+  "statusValue": "Η ΒΑΣΗ ΕΙΝΑΙ ΕΤΟΙΜΗ",
+  "description": "Ο βασικός κορμός της εφαρμογής είναι έτοιμος. Τα συστήματα αποστολών θα προστεθούν σε επόμενες φάσεις ανάπτυξης.",
+  "footerLabel": "STATIC OATH / ΒΑΣΗ ΕΦΑΡΜΟΓΗΣ",
+  "footerStatus": "ALPHA VERSION"
+}
