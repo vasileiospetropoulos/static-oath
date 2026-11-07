@@ -140,7 +140,8 @@
   width: min(100% - 3rem, 70rem);
   flex: 1;
   grid-template-columns: minmax(0, 1fr) minmax(14rem, 0.58fr);
-  align-content: center;
+  grid-template-rows: minmax(0, 1fr);
+  align-content: stretch;
   align-items: center;
   column-gap: clamp(2rem, 9vw, 8rem);
   align-self: center;
@@ -309,7 +310,10 @@ h1 {
 
 .system-panel {
   position: relative;
+  display: flex;
   width: min(100%, 33rem);
+  min-height: 10rem;
+  flex-direction: column;
   padding: 1.25rem 1.4rem 1.35rem;
   border: 1px solid var(--color-worn);
   border-left: 3px solid var(--color-olive);
@@ -360,11 +364,239 @@ h1 {
   letter-spacing: 0.08em;
 }
 
-.system-panel p {
-  margin: 0.72rem 0 0;
+.play-button {
+  display: flex;
+  width: 100%;
+  flex: 1;
+  min-height: 3.8rem;
+  align-items: center;
+  gap: 0.85rem;
+  margin-top: 0.85rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid rgb(133 138 102 / 42%);
+  color: var(--color-text);
+  background:
+    linear-gradient(100deg, rgb(133 138 102 / 10%), transparent 58%),
+    rgb(11 12 11 / 65%);
+  font-family: var(--font-mono);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    color 160ms ease;
+}
+
+.play-button:hover {
+  border-color: var(--color-olive);
+  background-color: rgb(52 53 48 / 55%);
+}
+
+.play-button:active {
+  background-color: rgb(52 53 48 / 82%);
+}
+
+.play-button:focus-visible,
+.back-button:focus-visible,
+.player-field input:focus-visible {
+  outline: 2px solid var(--color-olive);
+  outline-offset: 3px;
+}
+
+.play-button .status-indicator {
+  width: 0.55rem;
+  height: 0.55rem;
+}
+
+.play-button-copy {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.play-button-label {
+  color: var(--color-text);
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+}
+
+.play-button-support {
   color: var(--color-muted);
-  font-size: 0.84rem;
-  line-height: 1.7;
+  font-size: 0.55rem;
+  letter-spacing: 0.08em;
+}
+
+.registration-copy {
+  min-width: 0;
+}
+
+.registration-title {
+  display: block;
+  margin-top: 1.35rem;
+  font-size: clamp(1.7rem, 3.6vw, 2.8rem);
+  letter-spacing: 0.005em;
+  line-height: 0.95;
+}
+
+.registration-subtitle {
+  margin: 0.85rem 0 1.25rem;
+  color: var(--color-amber-text);
+  font-family: var(--font-mono);
+  font-size: 0.63rem;
+  letter-spacing: 0.12em;
+}
+
+.registration-panel {
+  width: min(100%, 33rem);
+  padding: 0.85rem 1rem 0.8rem;
+  border: 1px solid var(--color-worn);
+  border-left: 3px solid var(--color-olive);
+  background:
+    linear-gradient(112deg, rgb(52 53 48 / 52%), rgb(25 26 24 / 90%) 48%),
+    var(--color-panel);
+  box-shadow:
+    inset 0 1px rgb(255 255 255 / 3%),
+    0 1rem 2.5rem rgb(0 0 0 / 20%);
+}
+
+.registration-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.7rem 0.8rem;
+}
+
+.player-field {
+  display: grid;
+  min-width: 0;
+  gap: 0.35rem;
+  color: var(--color-muted);
+  font-family: var(--font-mono);
+  font-size: 0.55rem;
+  letter-spacing: 0.1em;
+}
+
+.player-field input {
+  width: 100%;
+  min-width: 0;
+  height: 2.2rem;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid var(--color-worn);
+  border-radius: 0;
+  color: var(--color-text);
+  background: rgb(11 12 11 / 72%);
+  font: 0.82rem var(--font-mono);
+}
+
+.player-field input:focus {
+  border-color: var(--color-olive);
+}
+
+.registration-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 0.6rem;
+}
+
+.back-button {
+  padding: 0.4rem 0.15rem;
+  border: 0;
+  color: var(--color-amber-text);
+  background: transparent;
+  font: 0.59rem var(--font-mono);
+  letter-spacing: 0.14em;
+  cursor: pointer;
+}
+
+.back-button:hover {
+  color: var(--color-text);
+}
+
+.next-button {
+  min-width: 6rem;
+  padding: 0.55rem 0.9rem;
+  border: 1px solid rgb(133 138 102 / 58%);
+  color: var(--color-text);
+  background:
+    linear-gradient(100deg, rgb(133 138 102 / 12%), transparent 75%),
+    rgb(11 12 11 / 65%);
+  font: 0.62rem var(--font-mono);
+  letter-spacing: 0.14em;
+  text-align: center;
+  cursor: pointer;
+}
+
+.next-button:hover:not(:disabled) {
+  border-color: var(--color-olive);
+  background-color: rgb(52 53 48 / 55%);
+}
+
+.next-button:active:not(:disabled) {
+  background-color: rgb(52 53 48 / 82%);
+}
+
+.next-button:focus-visible {
+  outline: 2px solid var(--color-olive);
+  outline-offset: 3px;
+}
+
+.next-button:disabled {
+  border-color: var(--color-worn);
+  color: var(--color-subtle);
+  background: rgb(11 12 11 / 35%);
+  cursor: not-allowed;
+}
+
+.handoff-panel {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.handoff-player {
+  margin: 0;
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-size: 1.15rem;
+  letter-spacing: 0.12em;
+}
+
+.handoff-instruction {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 0.82rem;
+  line-height: 1.6;
+}
+
+.classified-panel {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.classified-field {
+  display: grid;
+  gap: 0.35rem;
+  padding-bottom: 0.65rem;
+  border-bottom: 1px solid var(--color-border);
+  font-family: var(--font-mono);
+}
+
+.classified-field span {
+  color: var(--color-muted);
+  font-size: 0.55rem;
+  letter-spacing: 0.12em;
+}
+
+.classified-field strong {
+  color: var(--color-text);
+  font-size: 0.95rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+}
+
+.classified-panel .next-button,
+.handoff-panel .next-button {
+  justify-self: start;
 }
 
 .signal-plate {
@@ -769,6 +1001,14 @@ h1 {
 }
 
 @media (max-width: 560px) {
+  .operations-shell {
+    height: 100vh;
+    height: 100dvh;
+    overflow-x: hidden;
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+  }
+
   .topbar,
   .footer {
     padding-inline: 1rem;
@@ -796,7 +1036,10 @@ h1 {
 
   .hero {
     width: min(100% - 2rem, 28rem);
+    min-height: 0;
     grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+    align-content: stretch;
     row-gap: 2rem;
     padding-block: 1.8rem;
   }
@@ -817,15 +1060,38 @@ h1 {
   }
 
   .system-panel {
+    min-height: 10.65rem;
     padding: 1rem 1.05rem 1.1rem;
   }
 
-  .system-status h2 {
-    font-size: 0.85rem;
+  .play-button-support {
+    font-size: 0.51rem;
   }
 
-  .system-panel p {
-    font-size: 0.8rem;
+  .registration-title {
+    margin-top: 1.15rem;
+    font-size: clamp(1.55rem, 7.5vw, 2rem);
+  }
+
+  .registration-subtitle {
+    margin-bottom: 0.9rem;
+    font-size: 0.57rem;
+  }
+
+  .registration-panel {
+    padding: 0.7rem 0.75rem;
+  }
+
+  .registration-fields {
+    gap: 0.55rem;
+  }
+
+  .player-field {
+    font-size: 0.5rem;
+  }
+
+  .player-field input {
+    height: 2rem;
   }
 
   .signal-plate {

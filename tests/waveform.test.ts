@@ -215,13 +215,9 @@ describe('radio waveform', () => {
       waveformReady: true,
       prefersReducedMotion: false,
       documentVisible: true,
-      playbackActive: true,
     }
 
     expect(shouldAnimateWaveform(state)).toBe(true)
-    expect(shouldAnimateWaveform({ ...state, playbackActive: false })).toBe(
-      false,
-    )
     expect(
       shouldAnimateWaveform({ ...state, prefersReducedMotion: true }),
     ).toBe(false)

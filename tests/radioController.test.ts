@@ -19,6 +19,7 @@ interface FakeSource {
 }
 
 interface FakeAudio {
+  currentTime: number
   loop: boolean
   preload: string
   volume: number
@@ -74,6 +75,7 @@ interface TestEnvironment {
   storage: Map<string, string>
   fetchAudio: ReturnType<typeof vi.fn<(url: string) => Promise<Response>>>
   buffer: DecodedRadioBuffer
+  setNow: (time: number) => void
   triggerContextStateChange: () => void
 }
 
@@ -101,6 +103,7 @@ function createEnvironment(options?: {
   const sources: FakeSource[] = []
   const gains: FakeGain[] = []
   const fallbackAudios: FakeAudio[] = []
+  let now = 0
   let stateChangeListener: EventListener | undefined
   const buffer: DecodedRadioBuffer = {
     duration: 64,
@@ -120,6 +123,7 @@ function createEnvironment(options?: {
       setItem: (key, value) => storage.set(key, value),
     },
     fetchAudio,
+    now: () => now,
     createAudioContext: () => {
       const context = {
         state: options?.initialContextState ?? 'running',
@@ -190,6 +194,7 @@ function createEnvironment(options?: {
     },
     createFallbackAudio: () => {
       const audio: FakeAudio = {
+        currentTime: 0,
         loop: false,
         preload: '',
         volume: 0,
@@ -220,6 +225,9 @@ function createEnvironment(options?: {
     storage,
     fetchAudio,
     buffer,
+    setNow: (time) => {
+      now = time
+    },
     triggerContextStateChange: () =>
       stateChangeListener?.(new Event('statechange')),
   }
@@ -326,7 +334,7 @@ describe('radio ambience controller', () => {
     context.resume.mockImplementation(async () => {
       context.state = 'running'
     })
-    env.controller.enable()
+    env.controller.unlockFromUserGesture()
     await settlePromises()
 
     expect(env.controller.getSnapshot().status).toBe('on')
@@ -335,7 +343,7 @@ describe('radio ambience controller', () => {
     env.controller.dispose()
   })
 
-  it('reuses one context and decoded buffer across clean stop and restart', async () => {
+  it('mutes without stopping the source and restores its output on enable', async () => {
     const env = createEnvironment()
     env.controller.initialize()
     await settlePromises()
@@ -344,23 +352,26 @@ describe('radio ambience controller', () => {
 
     env.controller.disable()
     expect(env.storage.get(RADIO_PREFERENCE_KEY)).toBe('off')
-    expect(firstSource.stop).toHaveBeenCalledTimes(1)
-    expect(firstSource.disconnect).toHaveBeenCalledTimes(1)
+    expect(firstSource.stop).not.toHaveBeenCalled()
+    expect(firstSource.disconnect).not.toHaveBeenCalled()
+    expect(getItem(env.gains).gain.value).toBe(0)
+    env.controller.setVolume(0.7)
+    expect(getItem(env.gains).gain.value).toBe(0)
 
     env.controller.enable()
-    await settlePromises()
 
     expect(env.controller.getSnapshot().status).toBe('on')
     expect(env.contexts).toHaveLength(1)
     expect(env.fetchAudio).toHaveBeenCalledTimes(1)
     expect(getItem(env.contexts).decodeAudioData).toHaveBeenCalledTimes(1)
-    expect(env.sources).toHaveLength(2)
-    expect(getItem(env.sources, 1).buffer).toBe(firstBuffer)
+    expect(env.sources).toHaveLength(1)
+    expect(getItem(env.sources).buffer).toBe(firstBuffer)
+    expect(getItem(env.gains).gain.value).toBe(0.7)
     expect(env.storage.get(RADIO_PREFERENCE_KEY)).toBe('on')
     env.controller.dispose()
   })
 
-  it('freezes the waveform while OFF and resumes it from the audio timeline', async () => {
+  it('keeps the waveform moving while OFF and resumes from the audio timeline', async () => {
     const env = createEnvironment()
     env.controller.initialize()
     await settlePromises()
@@ -373,28 +384,86 @@ describe('radio ambience controller', () => {
       duration: 64,
     })
 
+    env.controller.disable()
+    expect(getItem(env.gains).gain.value).toBe(0)
+    context.currentTime += 1
+    expect(env.controller.getPlaybackPosition().position).toBeCloseTo(63.5)
+    expect(env.controller.getLiveWaveformPath()).not.toBe(activeWaveform)
+    const mutedWaveform = env.controller.getLiveWaveformPath()
+
     context.state = 'suspended'
     env.triggerContextStateChange()
     expect(env.controller.getSnapshot().playbackActive).toBe(false)
-    expect(env.controller.getPlaybackPosition().position).toBe(62.5)
-    env.controller.disable()
-    expect(env.controller.getPlaybackPosition().position).toBe(62.5)
-    expect(env.controller.getLiveWaveformPath()).toBe(activeWaveform)
+    expect(env.controller.getPlaybackPosition().position).toBeCloseTo(63.5)
+    expect(env.controller.getLiveWaveformPath()).toBe(mutedWaveform)
 
     context.state = 'running'
     env.triggerContextStateChange()
-    expect(env.controller.getSnapshot().playbackActive).toBe(false)
-    env.controller.enable()
-    await settlePromises()
-
-    expect(getItem(env.sources, 1).start).toHaveBeenCalledWith(0, 62.5)
     expect(env.controller.getSnapshot().playbackActive).toBe(true)
-    expect(env.controller.getPlaybackPosition().position).toBe(62.5)
-    expect(env.controller.getLiveWaveformPath()).toBe(activeWaveform)
+    env.controller.enable()
+
+    expect(env.sources).toHaveLength(1)
+    expect(env.controller.getSnapshot().playbackActive).toBe(true)
+    expect(getItem(env.gains).gain.value).toBe(INITIAL_RADIO_VOLUME)
+    expect(env.controller.getPlaybackPosition().position).toBeCloseTo(63.5)
+    expect(env.controller.getLiveWaveformPath()).toBe(mutedWaveform)
 
     context.currentTime += 1.75
-    expect(env.controller.getPlaybackPosition().position).toBeCloseTo(0.25)
-    expect(env.controller.getLiveWaveformPath()).not.toBe(activeWaveform)
+    expect(env.controller.getPlaybackPosition().position).toBeCloseTo(1.25)
+    expect(env.controller.getLiveWaveformPath()).not.toBe(mutedWaveform)
+    env.controller.dispose()
+  })
+
+  it('retries blocked autoplay synchronously from a user gesture', async () => {
+    let playAttempts = 0
+    const env = createEnvironment({
+      decode: async () => {
+        throw new Error('Unsupported FLAC frame.')
+      },
+      fallbackPlay: async () => {
+        playAttempts += 1
+        if (playAttempts === 1) {
+          throw new DOMException(
+            'Playback requires activation.',
+            'NotAllowedError',
+          )
+        }
+      },
+    })
+    env.controller.initialize()
+    await settlePromises()
+
+    expect(env.controller.getSnapshot().status).toBe('tap-to-enable')
+    const fallbackAudio = getItem(env.fallbackAudios)
+    expect(fallbackAudio.play).toHaveBeenCalledTimes(1)
+    env.controller.unlockFromUserGesture()
+
+    expect(fallbackAudio.play).toHaveBeenCalledTimes(2)
+    await settlePromises()
+    expect(env.controller.getSnapshot().status).toBe('standard-loop-on')
+    env.controller.dispose()
+  })
+
+  it('does not restart the radio after an explicit OFF preference', async () => {
+    const env = createEnvironment({ storedPreference: 'off' })
+    env.controller.initialize()
+    await settlePromises()
+
+    env.controller.unlockFromUserGesture()
+    expect(env.sources).toHaveLength(0)
+    expect(env.fallbackAudios).toHaveLength(0)
+    expect(env.controller.getSnapshot().status).toBe('off')
+    env.controller.dispose()
+  })
+
+  it('advances the waveform fallback while audio is unavailable', async () => {
+    const env = createEnvironment({ storedPreference: 'off' })
+    env.controller.initialize()
+    await settlePromises()
+    const initialWaveform = env.controller.getLiveWaveformPath()
+
+    env.setNow(1000)
+    expect(env.controller.getLiveWaveformPath()).not.toBe(initialWaveform)
     env.controller.dispose()
   })
 
@@ -435,7 +504,12 @@ describe('radio ambience controller', () => {
     expect(fallbackAudio.volume).toBe(INITIAL_RADIO_VOLUME)
 
     env.controller.disable()
-    expect(fallbackAudio.pause).toHaveBeenCalledTimes(1)
+    expect(fallbackAudio.pause).not.toHaveBeenCalled()
+    expect(fallbackAudio.volume).toBe(0)
+    env.controller.setVolume(0.7)
+    expect(fallbackAudio.volume).toBe(0)
+    env.controller.enable()
+    expect(fallbackAudio.volume).toBe(0.7)
     env.controller.dispose()
   })
 

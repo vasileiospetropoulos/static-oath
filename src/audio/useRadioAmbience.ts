@@ -41,6 +41,10 @@ export function useRadioAmbience() {
     controllerRef.current?.toggle()
   }, [])
 
+  const unlockFromUserGesture = useCallback(() => {
+    controllerRef.current?.unlockFromUserGesture()
+  }, [])
+
   const setVolume = useCallback((volume: number) => {
     controllerRef.current?.setVolume(volume)
   }, [])
@@ -50,5 +54,11 @@ export function useRadioAmbience() {
     [],
   )
 
-  return { ...snapshot, toggle, setVolume, getLiveWaveformPath }
+  return {
+    ...snapshot,
+    toggle,
+    unlockFromUserGesture,
+    setVolume,
+    getLiveWaveformPath,
+  }
 }

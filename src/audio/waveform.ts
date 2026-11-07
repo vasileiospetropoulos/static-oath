@@ -206,13 +206,9 @@ export function shouldAnimateWaveform(state: {
   waveformReady: boolean
   prefersReducedMotion: boolean
   documentVisible: boolean
-  playbackActive: boolean
 }): boolean {
   return (
-    state.waveformReady &&
-    !state.prefersReducedMotion &&
-    state.documentVisible &&
-    state.playbackActive
+    state.waveformReady && !state.prefersReducedMotion && state.documentVisible
   )
 }
 

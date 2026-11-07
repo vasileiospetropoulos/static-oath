@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import App from '../src/App'
 
 describe('application foundation', () => {
-  it('renders the STATIC OATH identity, accessible title, and foundation status', () => {
+  it('renders the STATIC OATH identity, accessible title, and play entry point', () => {
     const markup = renderToStaticMarkup(<App />)
 
     expect(markup).toContain('STATIC')
@@ -15,7 +15,11 @@ describe('application foundation', () => {
     expect(markup).toContain('ALPHA VERSION / 0.1')
     expect(markup).toContain('ALPHA VERSION</span>')
     expect(markup).not.toContain('LOCAL BUILD')
-    expect(markup).toContain('FOUNDATION ONLINE')
+    expect(markup).toContain('SENSOR ARRAY')
+    expect(markup).toContain('PLAY')
+    expect(markup).toContain('INITIALIZE NEW SESSION // 4 PLAYERS')
+    expect(markup).not.toContain('FOUNDATION ONLINE')
+    expect(markup).not.toContain('PLAYER REGISTRATION')
     expect(markup).not.toContain('Start game')
   })
 })

@@ -65,6 +65,7 @@ interface AudioContextLike {
 }
 
 interface FallbackAudioLike {
+  currentTime: number
   loop: boolean
   preload: string
   volume: number
@@ -87,6 +88,7 @@ interface RadioControllerOptions {
   createFallbackAudio: (url: string) => FallbackAudioLike
   storage?: StorageLike
   storageWarning?: string
+  now?: () => number
 }
 
 const decodedBufferPromises = new Map<string, Promise<DecodedRadioBuffer>>()
@@ -150,6 +152,7 @@ function readPreference(storage: StorageLike | undefined): {
 export class RadioAmbienceController {
   private readonly listeners = new Set<(snapshot: RadioSnapshot) => void>()
   private readonly options: RadioControllerOptions
+  private readonly now: () => number
   private context: AudioContextLike | null = null
   private gain: GainNodeLike | null = null
   private source: BufferSourceLike | null = null
@@ -160,6 +163,11 @@ export class RadioAmbienceController {
   private lastPosition = 0
   private fallbackAudio: FallbackAudioLike | null = null
   private fallbackRequired = false
+  private radioEnabled = true
+  private explicitlyDisabled = false
+  private autoplayBlocked = false
+  private visualClockStartedAt: number
+  private visualClockOffset = 0
   private disposed = false
   private initialized = false
   private attempt = 0
@@ -172,6 +180,8 @@ export class RadioAmbienceController {
   constructor(options: RadioControllerOptions) {
     this.options = options
     this.storageWarning = options.storageWarning ?? null
+    this.now = options.now ?? (() => performance.now())
+    this.visualClockStartedAt = this.now() / 1000
   }
 
   getSnapshot = (): RadioSnapshot => ({
@@ -180,7 +190,9 @@ export class RadioAmbienceController {
     error: this.error,
     waveformReady: this.waveformPeaks !== null,
     duration: this.decodedBuffer?.duration ?? 0,
-    playbackActive: this.source !== null && this.context?.state === 'running',
+    playbackActive:
+      (this.source !== null && this.context?.state === 'running') ||
+      (this.fallbackAudio !== null && !this.fallbackAudio.paused),
   })
 
   getLiveWaveformPath = (): string | null => {
@@ -193,7 +205,12 @@ export class RadioAmbienceController {
   }
 
   getPlaybackPosition = (): { duration: number; position: number } => {
-    if (this.source && this.context && this.decodedBuffer) {
+    if (
+      this.source &&
+      this.context &&
+      this.decodedBuffer &&
+      this.context.state === 'running'
+    ) {
       return getLoopedPlaybackPosition(
         this.context.currentTime,
         this.sourceStartedAt,
@@ -202,9 +219,32 @@ export class RadioAmbienceController {
       )
     }
 
+    if (
+      this.fallbackAudio &&
+      this.decodedBuffer &&
+      !this.fallbackAudio.paused
+    ) {
+      return {
+        position:
+          ((this.fallbackAudio.currentTime % this.decodedBuffer.duration) +
+            this.decodedBuffer.duration) %
+          this.decodedBuffer.duration,
+        duration: this.decodedBuffer.duration,
+      }
+    }
+
+    if (this.decodedBuffer) {
+      return getLoopedPlaybackPosition(
+        this.now() / 1000,
+        this.visualClockStartedAt,
+        this.visualClockOffset,
+        this.decodedBuffer.duration,
+      )
+    }
+
     return {
       position: this.lastPosition,
-      duration: this.decodedBuffer?.duration ?? 0,
+      duration: 0,
     }
   }
 
@@ -222,6 +262,8 @@ export class RadioAmbienceController {
     this.initialized = true
 
     const preference = readPreference(this.options.storage)
+    this.radioEnabled = preference.enabled
+    this.explicitlyDisabled = !preference.enabled
     this.storageWarning = preference.warning ?? this.storageWarning
     this.error = this.storageWarning
 
@@ -253,7 +295,48 @@ export class RadioAmbienceController {
       return
     }
 
+    this.radioEnabled = true
+    this.explicitlyDisabled = false
+    this.updateOutputGain()
+
+    if (this.fallbackAudio && !this.fallbackAudio.paused) {
+      this.fallbackAudio.volume = this.volume
+      this.pendingPreference('on')
+      this.publish('standard-loop-on')
+      return
+    }
+
+    if (this.source && this.context?.state === 'running') {
+      this.pendingPreference('on')
+      this.publish('on')
+      return
+    }
+
+    if (this.autoplayBlocked) {
+      this.autoplayBlocked = false
+    }
+
     this.requestPlayback(true)
+  }
+
+  unlockFromUserGesture(): void {
+    if (this.disposed || this.explicitlyDisabled) {
+      return
+    }
+
+    if (this.autoplayBlocked) {
+      this.autoplayBlocked = false
+      this.requestPlayback(true)
+      return
+    }
+
+    if (
+      this.status === 'loading' ||
+      this.status === 'tap-to-enable' ||
+      (this.context && this.context.state !== 'running')
+    ) {
+      this.requestPlayback(true)
+    }
   }
 
   disable(): void {
@@ -262,7 +345,15 @@ export class RadioAmbienceController {
     }
 
     this.attempt += 1
-    this.stopSources()
+    this.radioEnabled = false
+    this.explicitlyDisabled = true
+    this.updateOutputGain()
+    if (this.fallbackAudio) {
+      this.fallbackAudio.volume = 0
+    }
+    if (this.source && this.context) {
+      this.lastPosition = this.getPlaybackPosition().position
+    }
     this.pendingPreference('off')
     this.publish('off')
   }
@@ -283,17 +374,10 @@ export class RadioAmbienceController {
 
   setVolume(volume: number): void {
     this.volume = Math.max(0, Math.min(1, volume))
-
-    if (this.gain && this.context) {
-      this.gain.gain.setTargetAtTime(
-        this.volume,
-        this.context.currentTime,
-        0.02,
-      )
-    }
+    this.updateOutputGain()
 
     if (this.fallbackAudio) {
-      this.fallbackAudio.volume = this.volume
+      this.fallbackAudio.volume = this.radioEnabled ? this.volume : 0
     }
 
     this.emit()
@@ -432,6 +516,15 @@ export class RadioAmbienceController {
         return
       }
 
+      if (this.source) {
+        this.updateOutputGain()
+        if (manual) {
+          this.pendingPreference('on')
+        }
+        this.publish('on')
+        return
+      }
+
       this.lastPosition = this.lastPosition % buffer.duration
       this.startBufferSource(attempt, manual, buffer)
     } catch (error: unknown) {
@@ -445,11 +538,24 @@ export class RadioAmbienceController {
     }
 
     const context = this.options.createAudioContext()
-    this.contextStateChangeHandler = () => this.emit()
+    this.contextStateChangeHandler = () => {
+      if (context.state !== 'running' && this.source && this.decodedBuffer) {
+        this.lastPosition = getLoopedPlaybackPosition(
+          context.currentTime,
+          this.sourceStartedAt,
+          this.sourceOffset,
+          this.decodedBuffer.duration,
+        ).position
+        this.visualClockOffset = this.lastPosition
+        this.visualClockStartedAt = this.now() / 1000
+      }
+
+      this.emit()
+    }
     context.addEventListener('statechange', this.contextStateChangeHandler)
     this.context = context
     const gain = context.createGain()
-    gain.gain.value = this.volume
+    gain.gain.value = this.radioEnabled ? this.volume : 0
     gain.connect(context.destination)
     this.gain = gain
   }
@@ -472,6 +578,8 @@ export class RadioAmbienceController {
         try {
           this.decodedBuffer = buffer
           this.waveformPeaks = createWaveformOverview(buffer)
+          this.visualClockOffset = this.lastPosition
+          this.visualClockStartedAt = this.now() / 1000
           this.emit()
         } catch (error: unknown) {
           this.error = `Radio waveform could not be generated: ${describeError(error)}`
@@ -517,6 +625,9 @@ export class RadioAmbienceController {
       this.sourceStartedAt = sourceStartTime
       this.sourceOffset = offset
       this.lastPosition = offset
+      this.visualClockOffset = offset
+      this.visualClockStartedAt = this.now() / 1000
+      this.updateOutputGain()
 
       if (manual) {
         this.pendingPreference('on')
@@ -542,7 +653,7 @@ export class RadioAmbienceController {
         const audio = this.options.createFallbackAudio(this.options.assetUrl)
         audio.loop = true
         audio.preload = 'none'
-        audio.volume = this.volume
+        audio.volume = this.radioEnabled ? this.volume : 0
         audio.addEventListener('error', this.handleFallbackError)
         this.fallbackAudio = audio
       }
@@ -565,6 +676,7 @@ export class RadioAmbienceController {
       }
 
       if (isAutoplayBlocked(error)) {
+        this.autoplayBlocked = true
         this.publish('tap-to-enable')
         return
       }
@@ -582,6 +694,7 @@ export class RadioAmbienceController {
     }
 
     if (isAutoplayBlocked(error)) {
+      this.autoplayBlocked = true
       this.publish('tap-to-enable')
       return
     }
@@ -612,6 +725,16 @@ export class RadioAmbienceController {
     }
 
     this.fallbackAudio?.pause()
+  }
+
+  private updateOutputGain(): void {
+    if (this.gain && this.context) {
+      this.gain.gain.setTargetAtTime(
+        this.radioEnabled ? this.volume : 0,
+        this.context.currentTime,
+        0.02,
+      )
+    }
   }
 
   private pendingPreference(preference: 'on' | 'off'): void {

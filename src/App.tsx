@@ -1,15 +1,46 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRadioAmbience } from './audio/useRadioAmbience'
 import { shouldAnimateWaveform } from './audio/waveform'
+import { assignPlayers, type AssignedPlayer } from './game/assignment'
+import {
+  arePlayerNamesComplete,
+  createEmptyPlayerNames,
+  updatePlayerName,
+} from './game/registration'
+import {
+  createBrowserUiSoundManager,
+  type UiButtonSound,
+  type UiSoundManager,
+} from './audio/uiSoundManager'
 import english from './localization/en/common.json'
 import './App.css'
 
 function App() {
   const waveformRef = useRef<SVGPathElement>(null)
+  const [screen, setScreen] = useState<
+    'menu' | 'registration' | 'handoff' | 'reveal' | 'complete'
+  >('menu')
+  const [playerNames, setPlayerNames] = useState(createEmptyPlayerNames)
+  const [assignedPlayers, setAssignedPlayers] = useState<AssignedPlayer[]>([])
+  const [activePlayerIndex, setActivePlayerIndex] = useState(0)
+  const [registrationSessionStarted, setRegistrationSessionStarted] =
+    useState(false)
+  const uiSoundManagerRef = useRef<UiSoundManager | null>(null)
   const radio = useRadioAmbience()
-  const playbackActive = radio.playbackActive
   const waveformReady = radio.waveformReady
   const getLiveWaveformPath = radio.getLiveWaveformPath
+
+  useEffect(() => {
+    uiSoundManagerRef.current ??= createBrowserUiSoundManager()
+  }, [])
+
+  const playButtonSound = (
+    button: HTMLButtonElement,
+    sound: UiButtonSound = 'interaction',
+  ) => {
+    uiSoundManagerRef.current ??= createBrowserUiSoundManager()
+    uiSoundManagerRef.current.playButton(button, sound)
+  }
 
   useEffect(() => {
     const waveform = waveformRef.current
@@ -54,7 +85,6 @@ function App() {
           waveformReady,
           prefersReducedMotion: reducedMotion.matches,
           documentVisible: !document.hidden,
-          playbackActive,
         })
       ) {
         animationFrame = window.requestAnimationFrame(animateWaveform)
@@ -70,10 +100,32 @@ function App() {
       reducedMotion.removeEventListener('change', updateAnimation)
       document.removeEventListener('visibilitychange', updateAnimation)
     }
-  }, [getLiveWaveformPath, playbackActive, waveformReady])
+  }, [getLiveWaveformPath, waveformReady])
 
   return (
-    <main className="operations-shell">
+    <main
+      className="operations-shell"
+      onPointerDownCapture={(event) => {
+        if (
+          event.target instanceof Element &&
+          event.target.closest('.radio-toggle')
+        ) {
+          return
+        }
+
+        radio.unlockFromUserGesture()
+      }}
+      onKeyDownCapture={(event) => {
+        if (
+          event.target instanceof Element &&
+          event.target.closest('.radio-toggle')
+        ) {
+          return
+        }
+
+        radio.unlockFromUserGesture()
+      }}
+    >
       <header className="topbar">
         <a className="wordmark" href="./" aria-label={english.title}>
           <span className="wordmark-mark" aria-hidden="true">
@@ -91,39 +143,208 @@ function App() {
 
       <section className="hero" aria-labelledby="project-title">
         <div className="hero-copy">
-          <div className="hero-kicker">
-            <span className="status-dot" aria-hidden="true" />
-            {english.eyebrow}
-          </div>
-          <h1 id="project-title" aria-label="STATIC OATH">
-            <span className="title-static" aria-hidden="true">
-              {Array.from('STATIC').map((letter, index) => (
-                <span className="title-letter" key={index}>
-                  {letter}
+          {screen === 'menu' ? (
+            <>
+              <div className="hero-kicker">
+                <span className="status-dot" aria-hidden="true" />
+                {english.eyebrow}
+              </div>
+              <h1 id="project-title" aria-label="STATIC OATH">
+                <span className="title-static" aria-hidden="true">
+                  {Array.from('STATIC').map((letter, index) => (
+                    <span className="title-letter" key={index}>
+                      {letter}
+                    </span>
+                  ))}
                 </span>
-              ))}
-            </span>
-            <span className="title-oath" aria-hidden="true">
-              {Array.from('OATH').map((letter, index) => (
-                <span className="title-letter" key={index}>
-                  {letter}
+                <span className="title-oath" aria-hidden="true">
+                  {Array.from('OATH').map((letter, index) => (
+                    <span className="title-letter" key={index}>
+                      {letter}
+                    </span>
+                  ))}
                 </span>
-              ))}
-            </span>
-          </h1>
-          <p className="tagline">{english.tagline}</p>
+              </h1>
+              <p className="tagline">{english.tagline}</p>
 
-          <div className="system-panel" aria-label={english.statusLabel}>
-            <div className="panel-heading">
-              <span>{english.statusLabel}</span>
-              <span className="panel-code">{english.panelCode}</span>
+              <div className="system-panel" aria-label={english.statusLabel}>
+                <div className="panel-heading">
+                  <span>{english.statusLabel}</span>
+                  <span className="panel-code">{english.panelCode}</span>
+                </div>
+                <button
+                  className="play-button"
+                  type="button"
+                  onClick={(event) => {
+                    playButtonSound(event.currentTarget)
+                    if (!registrationSessionStarted) {
+                      setPlayerNames(createEmptyPlayerNames())
+                      setAssignedPlayers([])
+                      setActivePlayerIndex(0)
+                      setRegistrationSessionStarted(true)
+                    }
+                    setScreen('registration')
+                  }}
+                >
+                  <span className="status-indicator" aria-hidden="true" />
+                  <span className="play-button-copy">
+                    <span className="play-button-label">
+                      {english.playLabel}
+                    </span>
+                    <span className="play-button-support">
+                      {english.playSupport}
+                    </span>
+                  </span>
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="registration-copy">
+              <div className="hero-kicker">
+                <span className="status-dot" aria-hidden="true" />
+                {english.eyebrow}
+              </div>
+              {screen === 'registration' && (
+                <>
+                  <h1 className="registration-title" id="project-title">
+                    {english.registrationTitle}
+                  </h1>
+                  <p className="registration-subtitle">
+                    {english.registrationSubtitle}
+                  </p>
+                  <div className="registration-panel">
+                    <div className="registration-fields">
+                      {english.playerLabels.map((label, index) => (
+                        <label className="player-field" key={label}>
+                          <span>{label}</span>
+                          <input
+                            type="text"
+                            name={`player-${index + 1}`}
+                            autoComplete="off"
+                            value={playerNames[index]}
+                            onChange={(event) => {
+                              const name = event.currentTarget.value
+                              setPlayerNames((currentNames) =>
+                                updatePlayerName(currentNames, index, name),
+                              )
+                            }}
+                          />
+                        </label>
+                      ))}
+                    </div>
+                    <div className="registration-actions">
+                      <button
+                        className="back-button"
+                        type="button"
+                        onClick={(event) => {
+                          playButtonSound(event.currentTarget)
+                          setScreen('menu')
+                        }}
+                      >
+                        {english.backLabel}
+                      </button>
+                      <button
+                        className="next-button"
+                        type="button"
+                        disabled={!arePlayerNamesComplete(playerNames)}
+                        onClick={(event) => {
+                          if (!arePlayerNamesComplete(playerNames)) {
+                            return
+                          }
+
+                          const players = assignPlayers(playerNames)
+                          playButtonSound(event.currentTarget, 'next')
+                          setAssignedPlayers(players)
+                          setActivePlayerIndex(0)
+                          setScreen('handoff')
+                        }}
+                      >
+                        {english.nextLabel}
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+              {screen === 'handoff' && (
+                <>
+                  <h1 className="registration-title" id="project-title">
+                    {english.privacyHandoffTitle}
+                  </h1>
+                  <p className="registration-subtitle">
+                    {english.privacyHandoffSubtitle}
+                  </p>
+                  <div className="registration-panel handoff-panel">
+                    <p className="handoff-player">
+                      {assignedPlayers[activePlayerIndex]?.name}
+                    </p>
+                    <p className="handoff-instruction">
+                      {english.privacyHandoffInstruction}
+                    </p>
+                    <button
+                      className="next-button"
+                      type="button"
+                      onClick={(event) => {
+                        playButtonSound(event.currentTarget)
+                        setScreen('reveal')
+                      }}
+                    >
+                      {english.revealButton}
+                    </button>
+                  </div>
+                </>
+              )}
+              {screen === 'reveal' && assignedPlayers[activePlayerIndex] && (
+                <>
+                  <h1 className="registration-title" id="project-title">
+                    {english.classifiedDataTitle}
+                  </h1>
+                  <p className="registration-subtitle">
+                    {assignedPlayers[activePlayerIndex].name}
+                  </p>
+                  <div className="registration-panel classified-panel">
+                    <div className="classified-field">
+                      <span>{english.workstationLabel}</span>
+                      <strong>
+                        {assignedPlayers[activePlayerIndex].workstation}
+                      </strong>
+                    </div>
+                    <div className="classified-field">
+                      <span>{english.allegianceLabel}</span>
+                      <strong>
+                        {assignedPlayers[activePlayerIndex].allegiance}
+                      </strong>
+                    </div>
+                    <button
+                      className="next-button"
+                      type="button"
+                      onClick={(event) => {
+                        playButtonSound(event.currentTarget)
+                        if (activePlayerIndex === assignedPlayers.length - 1) {
+                          setScreen('complete')
+                          return
+                        }
+
+                        setActivePlayerIndex((index) => index + 1)
+                        setScreen('handoff')
+                      }}
+                    >
+                      {english.hideContinueButton}
+                    </button>
+                  </div>
+                </>
+              )}
+              {screen === 'complete' && (
+                <>
+                  <h1 className="registration-title" id="project-title">
+                    {english.briefingCompleteTitle}
+                  </h1>
+                  <p className="registration-subtitle">
+                    {english.briefingCompleteSubtitle}
+                  </p>
+                </>
+              )}
             </div>
-            <div className="system-status">
-              <span className="status-indicator" aria-hidden="true" />
-              <h2>{english.statusValue}</h2>
-            </div>
-            <p>{english.description}</p>
-          </div>
+          )}
         </div>
 
         <div className="signal-plate" aria-hidden="true">
@@ -175,7 +396,10 @@ function App() {
             }
             aria-describedby={radio.error ? 'radio-error' : undefined}
             title={radio.error ?? undefined}
-            onClick={radio.toggle}
+            onClick={(event) => {
+              playButtonSound(event.currentTarget)
+              radio.toggle()
+            }}
           >
             {radio.status === 'on'
               ? 'RADIO / ON'
